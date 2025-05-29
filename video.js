@@ -1,45 +1,50 @@
-/// video.js
+// ==UserScript==
+// @name        uBO: Video Progress Saver
+// @description Saves and restores HTML5 video progress using localStorage
+// @include     *
+// @grant       none
+// @run-at      document-idle
+// ==/UserScript==
+
 (function () {
-  const INTERVAL = 5; // seconds
-  const STORAGE_KEY = 'video-progress';
-  const MAX_WAIT = 10000; // max time to wait for video (10 sec)
-  const CHECK_INTERVAL = 500;
+  'use strict';
 
-  let waited = 0;
+  const SAVE_INTERVAL = 5000; // ms
+  const STORAGE_KEY_PREFIX = 'ubo_video_progress_';
 
-  function trySetup() {
-    const container = document.getElementById('player');
-    if (!container) return;
+  function saveProgress(video) {
+    const key = STORAGE_KEY_PREFIX + location.href;
+    localStorage.setItem(key, video.currentTime);
+  }
 
-    const video = container.querySelector('video');
-    if (!video) return;
-
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        video.currentTime = parseFloat(saved);
-      } catch (e) {}
+  function loadProgress(video) {
+    const key = STORAGE_KEY_PREFIX + location.href;
+    const savedTime = parseFloat(localStorage.getItem(key));
+    if (!isNaN(savedTime)) {
+      video.currentTime = savedTime;
     }
+  }
 
-    let lastSaved = 0;
-    video.addEventListener('timeupdate', () => {
-      const now = Math.floor(video.currentTime);
-      if (Math.abs(now - lastSaved) >= INTERVAL) {
-        localStorage.setItem(STORAGE_KEY, now);
-        lastSaved = now;
-      }
+  function attach(video) {
+    if (!video || video.dataset.uboProgressAttached) return;
+    video.dataset.uboProgressAttached = 'true';
+    loadProgress(video);
+
+    let interval = setInterval(() => saveProgress(video), SAVE_INTERVAL);
+
+    video.addEventListener('ended', () => {
+      const key = STORAGE_KEY_PREFIX + location.href;
+      localStorage.removeItem(key);
+      clearInterval(interval);
     });
   }
 
-  // Wait until #player and video are available
-  const interval = setInterval(() => {
-    if (waited >= MAX_WAIT) {
-      clearInterval(interval);
-      return;
-    }
-    try {
-      trySetup();
-    } catch (e) {}
-    waited += CHECK_INTERVAL;
-  }, CHECK_INTERVAL);
+  const observer = new MutationObserver(() => {
+    document.querySelectorAll('video').forEach(attach);
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  // Initial run
+  document.querySelectorAll('video').forEach(attach);
 })();
