@@ -1,3 +1,4 @@
+/// video.js
 (function () {
   const INTERVAL = 5; // seconds
   const STORAGE_KEY = 'video-progress';
